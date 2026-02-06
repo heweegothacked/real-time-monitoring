@@ -1,6 +1,6 @@
 # Real-Time Monitoring System with AI Predictions
 
-A beginner-friendly project that demonstrates real-time data monitoring with machine learning-based predictions and anomaly detection. Perfect for a computer engineering student's portfolio.
+Real-time monitoring system with AI-powered anomaloy detection and trend prediction. Built with Python, Sci-kit learn, Streamlit, and Docker. Full CI/CD available via Github actions.
 
 ## 📋 Project Overview
 
@@ -113,7 +113,7 @@ The system uses **Linear Regression** to:
 - Predict future values based on past patterns
 - Generate predictions 5-20 steps ahead
 
-**How it works:**
+**Breakdown:**
 - Fits a line to historical data
 - Uses the line's equation to predict future values
 - Clips predictions to realistic ranges (e.g., -10°C to 50°C for temperature)
@@ -217,10 +217,10 @@ This project is provided as an educational resource for learning purposes.
 
 ## ✨ Credits
 
-Created as a comprehensive beginner-friendly portfolio project for computer engineering students.
+I created this to be a comprehensive beginner-friendly portfolio project for computer engineering students.
 
 ---
 
-**Happy Learning! 🚀**
+Heworth Abraham, Computer Science & Engineering Undergraduate🚀
 
 Feel free to modify, extend, and make this project your own!
