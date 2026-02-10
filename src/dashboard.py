@@ -1,6 +1,7 @@
 """
 Real-Time Monitoring Dashboard
 A Streamlit-based dashboard for visualizing sensor data and AI predictions.
+Integrates with SQLite database for persistent data storage.
 """
 
 import streamlit as st
@@ -17,6 +18,13 @@ sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from sensor_simulator import SensorSimulator
 from ml_model import MonitoringAIModel
+from database import DatabaseManager
+
+try:
+    from weather_api import WeatherAPIProvider, WeatherConfig
+    WEATHER_API_AVAILABLE = True
+except ImportError:
+    WEATHER_API_AVAILABLE = False
 
 
 # Page configuration
@@ -55,11 +63,12 @@ st.markdown("""
 # Initialize session state
 if 'simulator' not in st.session_state:
     st.session_state.simulator = SensorSimulator(random_seed=42)
-    st.session_state.data = pd.DataFrame()
+    st.session_state.db = DatabaseManager()
+    st.session_state.data = st.session_state.db.get_readings(limit=100)
     st.session_state.model = MonitoringAIModel()
 
 if 'num_readings' not in st.session_state:
-    st.session_state.num_readings = 0
+    st.session_state.num_readings = len(st.session_state.data)
 
 
 def main():
@@ -72,6 +81,35 @@ def main():
         
         # Data collection settings
         st.subheader("Data Collection")
+        
+        # Data source selection
+        if WEATHER_API_AVAILABLE:
+            data_source = st.radio(
+                "Data Source:",
+                ["📊 Simulated Sensor", "🌍 Real Weather API"],
+                help="Simulated: Random data for demo | Real: Actual weather data from OpenWeatherMap"
+            )
+        else:
+            data_source = "📊 Simulated Sensor"
+            st.info("Real Weather API requires OpenWeatherMap API key and `requests` library")
+        
+        # Show API configuration if real weather selected
+        if "🌍" in data_source:
+            st.warning("⚠️ Real Weather API Configuration Required")
+            weather_api_key = st.text_input(
+                "OpenWeatherMap API Key",
+                type="password",
+                help="Get free key at https://openweathermap.org/api"
+            )
+            weather_city = st.selectbox(
+                "Select City:",
+                WeatherConfig.SAMPLE_CITIES,
+                help="Weather data will be fetched for this city"
+            )
+        else:
+            weather_api_key = None
+            weather_city = None
+        
         num_initial_readings = st.slider(
             "Initial readings to generate:",
             min_value=10,
@@ -110,19 +148,68 @@ def main():
             help="How many time steps to predict into the future"
         )
         
+        use_lstm = st.checkbox(
+            "🧠 Use LSTM Neural Network",
+            value=False,
+            help="Enable advanced LSTM model for better long-term predictions (requires TensorFlow)"
+        )
+        
+        prediction_model = st.radio(
+            "Prediction Model:",
+            ["📊 Linear Regression", "🧠 LSTM (if enabled)"],
+            disabled=not use_lstm if use_lstm else False,
+            help="Choose prediction model for dashboard"
+        )
+        
         # Action buttons
         st.subheader("Actions")
         col1, col2 = st.columns(2)
         
         with col1:
             if st.button("🔄 Initialize System"):
-                st.session_state.simulator = SensorSimulator(random_seed=42)
-                st.session_state.data = st.session_state.simulator.generate_batch(
-                    num_readings=num_initial_readings,
-                    anomaly_probability=anomaly_prob
-                )
-                st.session_state.model = MonitoringAIModel(contamination=contamination)
-                st.session_state.model.train(st.session_state.data)
+                st.session_state.db = DatabaseManager()
+                
+                # Determine data source
+                if "🌍" in data_source and weather_api_key:
+                    if not WEATHER_API_AVAILABLE:
+                        st.error("Weather API not available. Install 'requests' library.")
+                    else:
+                        try:
+                            provider = WeatherAPIProvider(
+                                api_key=weather_api_key,
+                                city=weather_city
+                            )
+                            st.session_state.data = provider.generate_batch(
+                                num_readings=num_initial_readings,
+                                save_to_db=True
+                            )
+                            st.session_state.data_provider = provider
+                            source_name = f"🌍 Real Weather ({weather_city})"
+                        except Exception as e:
+                            st.error(f"Failed to fetch weather data: {str(e)}")
+                            st.session_state.data = pd.DataFrame()
+                            source_name = "Error"
+                else:
+                    st.session_state.simulator = SensorSimulator(random_seed=42)
+                    st.session_state.data = st.session_state.simulator.generate_batch(
+                        num_readings=num_initial_readings,
+                        anomaly_probability=anomaly_prob,
+                        save_to_db=True
+                    )
+                    source_name = "📊 Simulated"
+                
+                if len(st.session_state.data) > 0:
+                    st.session_state.model = MonitoringAIModel(
+                        contamination=contamination,
+                        use_lstm=use_lstm
+                    )
+                    st.session_state.model.train(st.session_state.data, epochs=5, verbose=0)
+                    st.session_state.num_readings = len(st.session_state.data)
+                    st.session_state.prediction_model_type = 'lstm' if use_lstm and '🧠' in prediction_model else 'linear'
+                    st.success(f"✓ System initialized with {source_name} and {'LSTM' if use_lstm else 'Linear Regression'} model!")
+                else:
+                    st.error("Failed to load initial data. Please try again.")
+                st.rerun()
                 st.session_state.num_readings = len(st.session_state.data)
                 st.success("✓ System initialized!")
                 st.rerun()

@@ -1,6 +1,11 @@
 """
 Machine Learning Model for Predictions and Anomaly Detection
 This module provides AI-powered predictions and anomaly detection capabilities.
+
+Features:
+- Isolation Forest for unsupervised anomaly detection
+- Linear Regression for traditional trend prediction
+- LSTM neural network for advanced time-series forecasting
 """
 
 import numpy as np
@@ -8,6 +13,17 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 from sklearn.linear_model import LinearRegression
+import warnings
+
+try:
+    import tensorflow as tf
+    from tensorflow import keras
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout
+    TENSORFLOW_AVAILABLE = True
+except ImportError:
+    TENSORFLOW_AVAILABLE = False
+    warnings.warn("TensorFlow not installed. LSTM model will be unavailable.")
 
 
 class MonitoringAIModel:
